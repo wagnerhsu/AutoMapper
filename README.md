@@ -1,6 +1,6 @@
 <img src="https://s3.amazonaws.com/automapper/logo.png" alt="AutoMapper">
 
-[![Build status](https://ci.appveyor.com/api/projects/status/q261l3sbokafmx1o/branch/develop?svg=true)](https://ci.appveyor.com/project/jbogard/automapper/branch/develop)
+[![Build status](https://ci.appveyor.com/api/projects/status/q261l3sbokafmx1o/branch/master?svg=true)](https://ci.appveyor.com/project/jbogard/automapper/branch/master)
 [![NuGet](http://img.shields.io/nuget/v/AutoMapper.svg)](https://www.nuget.org/packages/AutoMapper/)
 [![MyGet (dev)](https://img.shields.io/myget/automapperdev/v/AutoMapper.svg)](http://myget.org/gallery/automapperdev)
 
@@ -14,6 +14,7 @@ This is the main repository for AutoMapper, but there's more:
 * [IDataReader/Record Extensions](https://github.com/AutoMapper/AutoMapper.Data)
 * [Collection Extensions](https://github.com/AutoMapper/AutoMapper.Collection)
 * [Microsoft DI Extensions](https://github.com/AutoMapper/AutoMapper.Extensions.Microsoft.DependencyInjection)
+* [Expression Mapping](https://github.com/AutoMapper/AutoMapper.Extensions.ExpressionMapping)
 
 ### How do I get started?
 

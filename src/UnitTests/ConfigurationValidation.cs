@@ -61,7 +61,7 @@ namespace AutoMapper.UnitTests.ConfigurationValidation
                 else
                 {
                     _calledForValues = true;
-                    context.ObjectMapper.ShouldBeOfType<ArrayMapper>();
+                    context.ObjectMapper.ShouldBeOfType<ArrayCopyMapper>();
                     context.Types.SourceType.ShouldBe(typeof(int[]));
                     context.Types.DestinationType.ShouldBe(typeof(int[]));
                 }
@@ -574,6 +574,12 @@ namespace AutoMapper.UnitTests.ConfigurationValidation
         public void Should_ignore_bad_dtos_in_other_profiles()
         {
             typeof(AutoMapperConfigurationException).ShouldNotBeThrownBy(() => Configuration.AssertConfigurationIsValid("Good"));
+        }
+
+        [Fact]
+        public void Should_throw_when_profile_name_does_not_exist()
+        {
+            typeof(ArgumentOutOfRangeException).ShouldBeThrownBy(() => Configuration.AssertConfigurationIsValid("Does not exist"));
         }
     }
 

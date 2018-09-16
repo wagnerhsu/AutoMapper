@@ -23,7 +23,7 @@ namespace AutoMapper
             PublicReadAccessors = BuildPublicReadAccessors(publicReadableMembers);
             PublicWriteAccessors = BuildPublicAccessors(publicWritableMembers);
             PublicNoArgMethods = BuildPublicNoArgMethods();
-            Constructors = type.GetDeclaredConstructors().Where(ci => !ci.IsStatic).ToArray();
+            Constructors = GetAllConstructors(config.ShouldUseConstructor);
             PublicNoArgExtensionMethods = BuildPublicNoArgExtensionMethods(config.SourceExtensionMethods);
             AllMembers = PublicReadAccessors.Concat(PublicNoArgMethods).Concat(PublicNoArgExtensionMethods).ToList();
             DestinationMemberNames = AllMembers.Select(mi => new DestinationMemberName { Member = mi, Possibles = PossibleNames(mi.Name, config.Prefixes, config.Postfixes).ToArray() });
@@ -59,7 +59,9 @@ namespace AutoMapper
                     .Select(postfix => name.Remove(name.Length - postfix.Length));
         }
 
-        private static Func<MemberInfo, bool> MembersToMap(Func<PropertyInfo, bool> shouldMapProperty, Func<FieldInfo, bool> shouldMapField)
+        private static Func<MemberInfo, bool> MembersToMap(
+            Func<PropertyInfo, bool> shouldMapProperty, 
+            Func<FieldInfo, bool> shouldMapField)
         {
             return m =>
             {
@@ -70,7 +72,7 @@ namespace AutoMapper
                     case FieldInfo field:
                         return !field.IsStatic && shouldMapField(field);
                     default:
-                        throw new ArgumentException("Should be a field or property.");
+                        throw new ArgumentException("Should be a field or a property.");
                 }
             };
         }
@@ -107,14 +109,22 @@ namespace AutoMapper
             {
                 genericInterfaces = genericInterfaces.Union(new[] { Type });
             }
+
             return explicitExtensionMethods.Union
             (
-                from genericMethod in sourceExtensionMethodSearch
-                where genericMethod.IsGenericMethodDefinition
                 from genericInterface in genericInterfaces
                 let genericInterfaceArguments = genericInterface.GetTypeInfo().GenericTypeArguments
-                where genericMethod.GetGenericArguments().Length == genericInterfaceArguments.Length
-                let methodMatch = genericMethod.MakeGenericMethod(genericInterfaceArguments)
+                let matchedMethods = (
+                    from extensionMethod in sourceExtensionMethodSearch
+                    where !extensionMethod.IsGenericMethodDefinition
+                    select extensionMethod
+                ).Concat(
+                    from extensionMethod in sourceExtensionMethodSearch
+                    where extensionMethod.IsGenericMethodDefinition
+                        && extensionMethod.GetGenericArguments().Length == genericInterfaceArguments.Length
+                    select extensionMethod.MakeGenericMethod(genericInterfaceArguments)
+                )
+                from methodMatch in matchedMethods
                 where methodMatch.GetParameters()[0].ParameterType.GetTypeInfo().IsAssignableFrom(genericInterface.GetTypeInfo())
                 select methodMatch
             ).ToArray();
@@ -155,6 +165,11 @@ namespace AutoMapper
 
         private IEnumerable<MemberInfo> GetAllPublicWritableMembers(Func<MemberInfo, bool> membersToMap)
             => GetAllPublicMembers(PropertyWritable, FieldWritable, membersToMap);
+        
+        private IEnumerable<ConstructorInfo> GetAllConstructors(Func<ConstructorInfo, bool> shouldUseConstructor)
+        {
+            return Type.GetDeclaredConstructors().Where(shouldUseConstructor).ToArray();
+        }
 
         private static bool PropertyReadable(PropertyInfo propertyInfo) => propertyInfo.CanRead;
 

@@ -13,20 +13,23 @@ namespace AutoMapper
         public TypePair RequestedTypes { get; }
         public TypePair RuntimeTypes { get; }
         public ITypeMapConfiguration InlineConfig { get; }
+        public PropertyMap PropertyMap { get; }
 
-        public MapRequest(TypePair requestedTypes, TypePair runtimeTypes) 
-            : this(requestedTypes, runtimeTypes, new MapperConfiguration.DefaultTypeMapConfig(requestedTypes))
+        public MapRequest(TypePair requestedTypes, TypePair runtimeTypes, PropertyMap propertyMap = null) 
+            : this(requestedTypes, runtimeTypes, new MapperConfiguration.DefaultTypeMapConfig(requestedTypes), propertyMap)
         {
         }
 
-        public MapRequest(TypePair requestedTypes, TypePair runtimeTypes, ITypeMapConfiguration inlineConfig)
+        public MapRequest(TypePair requestedTypes, TypePair runtimeTypes, ITypeMapConfiguration inlineConfig, PropertyMap propertyMap = null)
         {
             RequestedTypes = requestedTypes;
             RuntimeTypes = runtimeTypes;
             InlineConfig = inlineConfig;
+            PropertyMap = propertyMap;
         }
 
-        public bool Equals(MapRequest other) => RequestedTypes.Equals(other.RequestedTypes) && RuntimeTypes.Equals(other.RuntimeTypes);
+        public bool Equals(MapRequest other) => 
+            RequestedTypes.Equals(other.RequestedTypes) && RuntimeTypes.Equals(other.RuntimeTypes) && Equals(PropertyMap, other.PropertyMap);
 
         public override bool Equals(object obj)
         {
@@ -34,7 +37,15 @@ namespace AutoMapper
             return obj is MapRequest && Equals((MapRequest) obj);
         }
 
-        public override int GetHashCode() => HashCodeCombiner.Combine(RequestedTypes, RuntimeTypes);
+        public override int GetHashCode()
+        {
+            var hashCode = HashCodeCombiner.Combine(RequestedTypes, RuntimeTypes);
+            if(PropertyMap != null)
+            {
+                hashCode = HashCodeCombiner.Combine(hashCode, PropertyMap.GetHashCode());
+            }
+            return hashCode;
+        }
 
         public static bool operator ==(MapRequest left, MapRequest right) => left.Equals(right);
 
@@ -88,15 +99,31 @@ namespace AutoMapper
         public TypePair? GetOpenGenericTypePair()
         {
             var isGeneric = SourceType.IsGenericType() || DestinationType.IsGenericType();
-            if (!isGeneric)
+            if(!isGeneric)
+            {
                 return null;
-
+            }
             var sourceGenericDefinition = SourceType.IsGenericType() ? SourceType.GetGenericTypeDefinition() : SourceType;
-            var destGenericDefinition = DestinationType.IsGenericType() ? DestinationType.GetGenericTypeDefinition() : DestinationType;
+            var destinationGenericDefinition = DestinationType.IsGenericType() ? DestinationType.GetGenericTypeDefinition() : DestinationType;
 
-            var genericTypePair = new TypePair(sourceGenericDefinition, destGenericDefinition);
+            return new TypePair(sourceGenericDefinition, destinationGenericDefinition);
+        }
 
-            return genericTypePair;
+        public TypePair CloseGenericTypes(TypePair closedTypes)
+        {
+            var sourceArguments = closedTypes.SourceType.GetGenericArguments();
+            var destinationArguments = closedTypes.DestinationType.GetGenericArguments();
+            if(sourceArguments.Length == 0)
+            {
+                sourceArguments = destinationArguments;
+            }
+            else if(destinationArguments.Length == 0)
+            {
+                destinationArguments = sourceArguments;
+            }
+            var closedSourceType = SourceType.IsGenericTypeDefinition() ? SourceType.MakeGenericType(sourceArguments) : SourceType;
+            var closedDestinationType = DestinationType.IsGenericTypeDefinition() ? DestinationType.MakeGenericType(destinationArguments) : DestinationType;
+            return new TypePair(closedSourceType, closedDestinationType);
         }
 
         public IEnumerable<TypePair> GetRelatedTypePairs()

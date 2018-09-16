@@ -9,6 +9,7 @@ using AutoMapper.Configuration.Internal;
 namespace AutoMapper.Configuration
 {
     using static Expression;
+    using static ExpressionFactory;
 
     public class MappingExpression : MappingExpression<object, object>, IMappingExpression
     {
@@ -17,9 +18,6 @@ namespace AutoMapper.Configuration
         }
 
         public new IMappingExpression ReverseMap() => (IMappingExpression) base.ReverseMap();
-
-        public IMappingExpression Substitute(Func<object, object> substituteFunc)
-            => (IMappingExpression) base.Substitute(substituteFunc);
 
         public new IMappingExpression ConstructUsingServiceLocator() 
             => (IMappingExpression)base.ConstructUsingServiceLocator();
@@ -328,18 +326,6 @@ namespace AutoMapper.Configuration
             return this;
         }
 
-        public IMappingExpression<TSource, TDestination> Substitute<TSubstitute>(Func<TSource, TSubstitute> substituteFunc)
-        {
-            TypeMapActions.Add(tm =>
-            {
-                Expression<Func<TSource, TDestination, ResolutionContext, TSubstitute>> expr = (src, dest, ctxt) => substituteFunc(src);
-
-                tm.Substitution = expr;
-            });
-
-            return this;
-        }
-
         public void ConvertUsing(Func<TSource, TDestination> mappingFunction)
         {
             TypeMapActions.Add(tm =>
@@ -641,8 +627,7 @@ namespace AutoMapper.Configuration
 
                     var pathMap = reverseTypeMap.FindOrCreatePathMapFor(forPathLambda, memberPath, reverseTypeMap);
 
-                    var newSource = Parameter(reverseTypeMap.SourceType, "source");
-                    pathMap.SourceExpression = Lambda(MakeMemberAccess(newSource, propertyMap.DestinationProperty), newSource);
+                    pathMap.SourceExpression = MemberAccessLambda(propertyMap.DestinationProperty);
                 });
             }
         }

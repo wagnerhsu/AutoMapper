@@ -93,11 +93,13 @@ namespace AutoMapper.UnitTests.Mappers
         {
             public static DestinationType Instance = new DestinationType();
 
-            public override DestinationType Map(SourceType source, DestinationType destination, ResolutionContext context)
+            public override DestinationType Map(SourceType source, DestinationType destination, Type sourceType, Type destinationType, ResolutionContext context)
             {
                 source.ShouldNotBeNull();
                 destination.ShouldNotBeNull();
                 context.ShouldNotBeNull();
+                sourceType.ShouldBe(typeof(SourceType));
+                destinationType.ShouldBe(typeof(DestinationType));
                 return Instance;
             }
 
@@ -146,12 +148,14 @@ namespace AutoMapper.UnitTests.Mappers
         {
             public override bool IsMatch(TypePair types)
             {
-                var underlyingType = Nullable.GetUnderlyingType(types.SourceType);
+                var underlyingType = Nullable.GetUnderlyingType(types.SourceType) ?? types.SourceType;
                 return underlyingType.IsEnum() && types.DestinationType == typeof(string);
             }
 
-            public override string Map(object source, string destination, ResolutionContext context)
+            public override string Map(object source, string destination, Type sourceType, Type destinationType, ResolutionContext context)
             {
+                sourceType.ShouldBe(typeof(ConsoleColor?));
+                destinationType.ShouldBe(typeof(string));
                 return "Test";
             }
         }

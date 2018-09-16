@@ -122,6 +122,10 @@ namespace AutoMapper
 
         IExpressionBuilder ExpressionBuilder { get; }
 
+        IEnumerable<IExpressionResultConverter> ResultConverters { get; }
+
+        IEnumerable<IExpressionBinder> Binders { get; }
+
         /// <summary>
         /// Create a mapper instance based on this configuration. Mapper instances are lightweight and can be created as needed.
         /// </summary>
@@ -135,7 +139,7 @@ namespace AutoMapper
         /// <returns>The mapper instance</returns>
         IMapper CreateMapper(Func<Type, object> serviceCtor);
 
-        Func<TSource, TDestination, ResolutionContext, TDestination> GetMapperFunc<TSource, TDestination>(TypePair types);
+        Func<TSource, TDestination, ResolutionContext, TDestination> GetMapperFunc<TSource, TDestination>(TypePair types, PropertyMap propertyMap = null);
         Func<TSource, TDestination, ResolutionContext, TDestination> GetMapperFunc<TSource, TDestination>(MapRequest mapRequest);
 
         /// <summary>
@@ -147,6 +151,10 @@ namespace AutoMapper
         Delegate GetMapperFunc(MapRequest request);
 
         Func<object, object, ResolutionContext, object> GetUntypedMapperFunc(MapRequest mapRequest);
+
+        void RegisterTypeMap(TypeMap typeMap);
+
+        IEnumerable<TypeMap> GetIncludedTypeMaps(IEnumerable<TypePair> includedTypes);
 
         /// <summary>
         /// Builds the execution plan used to map the source to destination.

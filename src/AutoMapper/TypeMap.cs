@@ -28,7 +28,7 @@ namespace AutoMapper
         private readonly IList<PropertyMap> _inheritedMaps = new List<PropertyMap>();
         private PropertyMap[] _orderedPropertyMaps;
         private bool _sealed;
-        private readonly IList<TypeMap> _inheritedTypeMaps = new List<TypeMap>();
+        private readonly List<TypeMap> _inheritedTypeMaps = new List<TypeMap>();
         private readonly List<ValueTransformerConfiguration> _valueTransformerConfigs = new List<ValueTransformerConfiguration>();
 
         public TypeMap(TypeDetails sourceType, TypeDetails destinationType, ProfileMap profile)
@@ -58,6 +58,8 @@ namespace AutoMapper
         public TypePair Types { get; }
 
         public ConstructorMap ConstructorMap { get; set; }
+
+        public TypePair[] ConstructorMappingTypes { get; set; }
 
         public TypeDetails SourceTypeDetails { get; }
         public TypeDetails DestinationTypeDetails { get; }
@@ -90,7 +92,6 @@ namespace AutoMapper
 
         public int MaxDepth { get; set; }
 
-        public LambdaExpression Substitution { get; set; }
         public LambdaExpression ConstructExpression { get; set; }
         public Type TypeConverterType { get; set; }
         public bool DisableConstructorValidation { get; set; }
@@ -180,10 +181,8 @@ namespace AutoMapper
             if (DestinationTypeToUse.IsValueType())
                 return true;
 
-            var constructors = DestinationTypeToUse
-                .GetDeclaredConstructors()
-                .Where(ci => !ci.IsStatic);
-
+            var constructors = DestinationTypeDetails.Constructors;
+            
             //find a ctor with only optional args
             var ctorWithOptionalArgs = constructors.FirstOrDefault(c => c.GetParameters().All(p => p.IsOptional));
 
@@ -243,8 +242,6 @@ namespace AutoMapper
             return match.DestinationType ?? DestinationType;
         }
 
-        public bool TypeHasBeenIncluded(TypePair derivedTypes) => _includedDerivedTypes.Contains(derivedTypes);
-
         public bool HasDerivedTypesToInclude() => _includedDerivedTypes.Any() || DestinationTypeOverride != null;
 
         public void AddBeforeMapAction(LambdaExpression beforeMap)
@@ -268,7 +265,7 @@ namespace AutoMapper
             _valueTransformerConfigs.Add(valueTransformerConfiguration);
         }
 
-        public void Seal(IConfigurationProvider configurationProvider, Stack<TypeMap> typeMapsPath = null)
+        public void Seal(IConfigurationProvider configurationProvider)
         {
             if(_sealed)
             {
@@ -286,8 +283,13 @@ namespace AutoMapper
                     .Union(_inheritedMaps)
                     .OrderBy(map => map.MappingOrder).ToArray();
 
-            MapExpression = new TypeMapPlanBuilder(configurationProvider, this).CreateMapperLambda(typeMapsPath);
+            MapExpression = CreateMapperLambda(configurationProvider, null);
         }
+
+        internal LambdaExpression CreateMapperLambda(IConfigurationProvider configurationProvider, HashSet<TypeMap> typeMapsPath) =>
+            SourceType.IsGenericTypeDefinition() || DestinationTypeToUse.IsGenericTypeDefinition() ?
+                null :
+                new TypeMapPlanBuilder(configurationProvider, this).CreateMapperLambda(typeMapsPath);
 
         public PropertyMap GetExistingPropertyMapFor(MemberInfo destinationProperty)
         {
@@ -321,15 +323,6 @@ namespace AutoMapper
                 return propertyMap;
 
             return null;
-        }
-
-        public void InheritTypes(TypeMap inheritedTypeMap)
-        {
-            foreach (var includedDerivedType in inheritedTypeMap._includedDerivedTypes
-                .Where(includedDerivedType => !_includedDerivedTypes.Contains(includedDerivedType)))
-            {
-                _includedDerivedTypes.Add(includedDerivedType);
-            }
         }
 
         public SourceMemberConfig FindOrCreateSourceMemberConfigFor(MemberInfo sourceMember)
@@ -395,5 +388,7 @@ namespace AutoMapper
                     baseConfig => PathMaps.All(derivedConfig => derivedConfig.MemberPath != baseConfig.MemberPath));
             _pathMaps.AddRange(notOverridenPathMaps);
         }
+
+        internal void CopyInheritedMapsTo(TypeMap typeMap) => typeMap._inheritedTypeMaps.AddRange(_inheritedTypeMaps);
     }
 }

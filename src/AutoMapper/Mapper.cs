@@ -200,7 +200,7 @@ namespace AutoMapper
         TDestination IMapper.Map<TDestination>(object source)
         {
             if (source == null)
-                return default(TDestination);
+                return default;
 
             var types = new TypePair(source.GetType(), typeof(TDestination));
 
@@ -354,20 +354,20 @@ namespace AutoMapper
             return destination;
         }
 
-        object IRuntimeMapper.Map(object source, object destination, Type sourceType, Type destinationType, ResolutionContext context)
+        object IRuntimeMapper.Map(object source, object destination, Type sourceType, Type destinationType, ResolutionContext context, PropertyMap propertyMap)
         {
             var types = TypePair.Create(source, destination, sourceType, destinationType);
 
-            var func = _configurationProvider.GetUntypedMapperFunc(new MapRequest(new TypePair(sourceType, destinationType), types));
+            var func = _configurationProvider.GetUntypedMapperFunc(new MapRequest(new TypePair(sourceType, destinationType), types, propertyMap));
 
             return func(source, destination, context);
         }
 
-        TDestination IRuntimeMapper.Map<TSource, TDestination>(TSource source, TDestination destination, ResolutionContext context)
+        TDestination IRuntimeMapper.Map<TSource, TDestination>(TSource source, TDestination destination, ResolutionContext context, PropertyMap propertyMap)
         {
             var types = TypePair.Create(source, destination, typeof(TSource), typeof(TDestination));
 
-            var func = _configurationProvider.GetMapperFunc<TSource, TDestination>(types);
+            var func = _configurationProvider.GetMapperFunc<TSource, TDestination>(types, propertyMap);
 
             return func(source, destination, context);
         }

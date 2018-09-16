@@ -47,7 +47,7 @@ In the below example, we'll use the first option, telling AutoMapper the custom 
 ```c#
 Mapper.Initialize(cfg =>
    cfg.CreateMap<Source, Destination>()
-	 .ForMember(dest => dest.Total, opt => opt.ResolveUsing<CustomResolver>());
+	 .ForMember(dest => dest.Total, opt => opt.ResolveUsing<CustomResolver>()));
 Mapper.AssertConfigurationIsValid();
 
 var source = new Source
@@ -83,7 +83,7 @@ If we don't want AutoMapper to use reflection to create the instance, we can sup
 Mapper.Initialize(cfg => cfg.CreateMap<Source, Destination>()
 	.ForMember(dest => dest.Total,
 		opt => opt.ResolveUsing(new CustomResolver())
-	);
+	));
 ```
 
 AutoMapper will use that specific object, helpful in scenarios where the resolver might have constructor arguments or need to be constructed by an IoC container.
@@ -121,9 +121,81 @@ This is how to setup the mapping for this custom resolver
 
 ```c#
 Mapper.CreateMap<Source, Dest>()
-    .ForMember(d => d.Foo, opt => opt.ResolveUsing((src, dest, destMember, res) => res.Context.Options.Items["Foo"]));
+    .ForMember(dest => dest.Foo, opt => opt.ResolveUsing((src, dest, destMember, context) => context.Items["Foo"]));
 ```
 
 ### ForPath
 
 Similar to ForMember, from 6.1.0 there is ForPath. Check out [the tests](https://github.com/AutoMapper/AutoMapper/search?utf8=%E2%9C%93&q=ForPath&type=) for examples.
+
+### Resolvers and conditions
+
+For each property mapping, AutoMapper attempts to resolve the destination value **before** evaluating the condition. So it needs to be able to do that without throwing an exception even if the condition will prevent the resulting value from being used.
+
+As an example, here's sample output from [BuildExecutionPlan](Understanding-your-mapping.html) (displayed using [ReadableExpressions](https://marketplace.visualstudio.com/items?itemName=vs-publisher-1232914.ReadableExpressionsVisualizers)) for a single property:
+
+```c#
+try
+{
+	var resolvedValue =
+	{
+		try
+		{
+			return // ... tries to resolve the destination value here
+		}
+		catch (NullReferenceException)
+		{
+			return null;
+		}
+		catch (ArgumentNullException)
+		{
+			return null;
+		}
+	};
+
+	if (condition.Invoke(src, typeMapDestination, resolvedValue))
+	{
+		typeMapDestination.WorkStatus = resolvedValue;
+	}
+}
+catch (Exception ex)
+{
+	throw new AutoMapperMappingException(
+		"Error mapping types.",
+		ex,
+		AutoMapper.TypePair,
+		AutoMapper.TypeMap,
+		AutoMapper.PropertyMap);
+};
+```
+The default generated code for resolving a property, if you haven't customized the mapping for that member, generally doesn't have any problems.  But if you're using custom code to map the property that will crash if the condition isn't met, the mapping will fail despite the condition.
+
+This example code would fail:
+
+```c#
+public class SourceClass 
+{ 
+	public string Value { get; set; }
+}
+
+public class TargetClass 
+{
+	public int ValueLength { get; set; }
+}
+
+// ...
+
+var source = new SourceClass { Value = null };
+var target = new TargetClass;
+
+CreateMap<SourceClass, TargetClass>()
+	.ForMember(d => d.ValueLength, o => o.MapFrom(s => s.Value.Length))
+	.ForAllMembers(o => o.Condition((src, dest, value) => value != null));
+```
+The condition prevents the Value property from being mapped onto the target, but the custom member mapping would fail before that point because it calls Value.Length, and Value is null. 
+
+Prevent this by using a [PreCondition](Conditional-mapping.html#preconditions) instead or by ensuring the custom member mapping code can complete safely regardless of conditions:
+
+```c#
+	.ForMember(d => d.ValueLength, o => o.MapFrom(s => s != null ? s.Value.Length : 0))
+```

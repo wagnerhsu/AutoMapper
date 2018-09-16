@@ -9,6 +9,7 @@ using AutoMapper.Configuration;
 namespace AutoMapper
 {
     using static Expression;
+    using static Internal.ExpressionFactory;
 
     [DebuggerDisplay("{DestinationProperty.Name}")]
     public class PropertyMap
@@ -16,6 +17,8 @@ namespace AutoMapper
         private readonly List<MemberInfo> _memberChain = new List<MemberInfo>();
         private readonly List<ValueTransformerConfiguration> _valueTransformerConfigs = new List<ValueTransformerConfiguration>();
 
+        internal static PropertyMap Default { get; } = new PropertyMap(default(MemberInfo), default);
+        
         public PropertyMap(PathMap pathMap)
         {
             Condition = pathMap.Condition;
@@ -56,15 +59,11 @@ namespace AutoMapper
         public object NullSubstitute { get; set; }
         public ValueResolverConfiguration ValueResolverConfig { get; set; }
         public IEnumerable<ValueTransformerConfiguration> ValueTransformers => _valueTransformerConfigs;
-        public string CustomSourceMemberName { get; set; }
 
         public MemberInfo SourceMember
         {
             get
             {
-                if (CustomSourceMemberName != null)
-                    return TypeMap.SourceType.GetFieldOrProperty(CustomSourceMemberName);
-
                 if (CustomExpression != null)
                 {
                     var finder = new MemberFinderVisitor();
@@ -114,7 +113,6 @@ namespace AutoMapper
             NullSubstitute = NullSubstitute ?? inheritedMappedProperty.NullSubstitute;
             MappingOrder = MappingOrder ?? inheritedMappedProperty.MappingOrder;
             ValueResolverConfig = ValueResolverConfig ?? inheritedMappedProperty.ValueResolverConfig;
-            CustomSourceMemberName = CustomSourceMemberName ?? inheritedMappedProperty.CustomSourceMemberName;
         }
 
         public bool IsMapped() => HasSource() || Ignored;
@@ -123,12 +121,21 @@ namespace AutoMapper
 
         public bool HasSource() => _memberChain.Count > 0 || ResolveConfigured();
 
-        public bool ResolveConfigured() => ValueResolverConfig != null || CustomResolver != null || CustomExpression != null || CustomSourceMemberName != null;
+        public bool ResolveConfigured() => ValueResolverConfig != null || CustomResolver != null || CustomExpression != null;
 
         public void MapFrom(LambdaExpression sourceMember)
         {
             CustomExpression = sourceMember;
             Ignored = false;
+        }
+
+        public void MapFrom(string propertyOrField)
+        {
+            if(TypeMap.SourceType.IsGenericTypeDefinition())
+            {
+                return;
+            }
+            MapFrom(MemberAccessLambda(TypeMap.SourceType, propertyOrField));
         }
 
         public void AddValueTransformation(ValueTransformerConfiguration valueTransformerConfiguration)

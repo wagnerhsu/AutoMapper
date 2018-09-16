@@ -306,6 +306,7 @@ namespace AutoMapper.UnitTests.DynamicMapping
         }
     }
 
+#if DYNAMIC_METHODS
     public class When_mapping_from_an_anonymous_type_to_an_interface : NonValidatingSpecBase
     {
         private IDestination _result;
@@ -328,6 +329,7 @@ namespace AutoMapper.UnitTests.DynamicMapping
 
         protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg => { });
     }
+#endif
 
     public class When_dynamically_mapping_a_badly_configured_map : NonValidatingSpecBase
     {
@@ -345,7 +347,9 @@ namespace AutoMapper.UnitTests.DynamicMapping
         [Fact]
         public void Should_throw()
         {
-            typeof(AutoMapperConfigurationException).ShouldBeThrownBy(() => Mapper.Map<Source, Dest>(new Source()));
+            new Action(() => Mapper.Map<Source, Dest>(new Source()))
+                .ShouldThrowException<AutoMapperConfigurationException>(
+                    ex=>ex.Message.ShouldContain("AutoMapper created this type map for you, but your types cannot be mapped using the current configuration.", Case.Sensitive));
         }
     }
 

@@ -2,11 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
 
 namespace AutoMapper
 {
-#if NET45 || NET40
+#if DYNAMIC_METHODS
     using System.Reflection.Emit;
 #endif
 
@@ -22,20 +21,12 @@ namespace AutoMapper
 
         public static IEnumerable<ConstructorInfo> GetDeclaredConstructors(this Type type) => type.GetTypeInfo().DeclaredConstructors;
 
-#if !NET40 && !NET45
-        public static MethodInfo GetAddMethod(this EventInfo eventInfo) => eventInfo.AddMethod;
-
-        public static MethodInfo GetRemoveMethod(this EventInfo eventInfo) => eventInfo.RemoveMethod;
-#endif
-
+#if DYNAMIC_METHODS
         public static Type CreateType(this TypeBuilder type)
         {
-#if NET40
-            return type.CreateType();
-#else
             return type.CreateTypeInfo().AsType();
-#endif
         }
+#endif
 
         public static IEnumerable<MemberInfo> GetDeclaredMembers(this Type type) => type.GetTypeInfo().DeclaredMembers;
 
@@ -90,7 +81,7 @@ namespace AutoMapper
 
         public static IEnumerable<PropertyInfo> PropertiesWithAnInaccessibleSetter(this Type type)
         {
-            return type.GetDeclaredProperties().Where(pm => pm.HasAnInaccessibleSetter());
+            return type.GetRuntimeProperties().Where(pm => pm.HasAnInaccessibleSetter());
         }
 
         public static bool HasAnInaccessibleSetter(this PropertyInfo property)
@@ -136,11 +127,6 @@ namespace AutoMapper
 
         public static PropertyInfo[] GetProperties(this Type type) => type.GetRuntimeProperties().ToArray();
 
-#if NET40
-        public static MethodInfo GetGetMethod(this PropertyInfo propertyInfo, bool ignored) => propertyInfo.GetGetMethod();
-
-        public static MethodInfo GetSetMethod(this PropertyInfo propertyInfo, bool ignored) => propertyInfo.GetSetMethod();
-#else
         public static MethodInfo GetGetMethod(this PropertyInfo propertyInfo, bool ignored) => propertyInfo.GetMethod;
 
         public static MethodInfo GetSetMethod(this PropertyInfo propertyInfo, bool ignored) => propertyInfo.SetMethod;
@@ -148,7 +134,6 @@ namespace AutoMapper
         public static MethodInfo GetGetMethod(this PropertyInfo propertyInfo) => propertyInfo.GetMethod;
 
         public static MethodInfo GetSetMethod(this PropertyInfo propertyInfo) => propertyInfo.SetMethod;
-#endif
 
         public static FieldInfo GetField(this Type type, string name) => type.GetRuntimeField(name);
     }
