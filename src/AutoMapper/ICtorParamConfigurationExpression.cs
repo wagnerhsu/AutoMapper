@@ -15,16 +15,11 @@ namespace AutoMapper
         void MapFrom<TMember>(Expression<Func<TSource, TMember>> sourceMember);
 
         /// <summary>
-        /// Map constructor parameter from custom func
-        /// </summary>
-        /// <param name="resolver">Custom func</param>
-        void ResolveUsing<TMember>(Func<TSource, TMember> resolver);
-
-        /// <summary>
         /// Map constructor parameter from custom func that has access to <see cref="ResolutionContext"/>
         /// </summary>
+        /// <remarks>Not used for LINQ projection (ProjectTo)</remarks>
         /// <param name="resolver">Custom func</param>
-        void ResolveUsing<TMember>(Func<TSource, ResolutionContext, TMember> resolver);
+        void MapFrom<TMember>(Func<TSource, ResolutionContext, TMember> resolver);
     }
 
     public class CtorParamConfigurationExpression<TSource> : ICtorParamConfigurationExpression<TSource>
@@ -36,19 +31,13 @@ namespace AutoMapper
 
         public void MapFrom<TMember>(Expression<Func<TSource, TMember>> sourceMember)
         {
-            _ctorParamActions.Add(cpm => cpm.CustomExpression = sourceMember);
+            _ctorParamActions.Add(cpm => cpm.CustomMapExpression = sourceMember);
         }
 
-        public void ResolveUsing<TMember>(Func<TSource, TMember> resolver)
-        {
-            Expression<Func<TSource, ResolutionContext, TMember>> resolverExpression = (src, ctxt) => resolver(src);
-            _ctorParamActions.Add(cpm => cpm.CustomValueResolver = resolverExpression);
-        }
-
-        public void ResolveUsing<TMember>(Func<TSource, ResolutionContext, TMember> resolver)
+        public void MapFrom<TMember>(Func<TSource, ResolutionContext, TMember> resolver)
         {
             Expression<Func<TSource, ResolutionContext, TMember>> resolverExpression = (src, ctxt) => resolver(src, ctxt);
-            _ctorParamActions.Add(cpm => cpm.CustomValueResolver = resolverExpression);
+            _ctorParamActions.Add(cpm => cpm.CustomMapFunction = resolverExpression);
         }
 
         public void Configure(TypeMap typeMap)
@@ -64,7 +53,7 @@ namespace AutoMapper
             {
                 throw new AutoMapperConfigurationException($"{typeMap.Types.DestinationType.Name} does not have a constructor with a parameter named '{_ctorParamName}'.\n{typeMap.Types.DestinationType.FullName}");
             }
-            parameter.CanResolve = true;
+            parameter.CanResolveValue = true;
 
             foreach (var action in _ctorParamActions)
             {

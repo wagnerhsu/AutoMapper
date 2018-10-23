@@ -52,7 +52,7 @@ namespace AutoMapper.UnitTests.ConfigurationValidation
             else
             {
                 context.PropertyMap.SourceMember.Name.ShouldBe("Values");
-                context.PropertyMap.DestinationProperty.Name.ShouldBe("Values");
+                context.PropertyMap.DestinationName.ShouldBe("Values");
                 if(context.Types.Equals(new TypePair(typeof(int), typeof(int))))
                 {
                     _calledForInt = true;
@@ -627,7 +627,7 @@ namespace AutoMapper.UnitTests.ConfigurationValidation
         {
             object i = 7;
             cfg.CreateMap<Source, Destination>()
-                .ForMember(dest => dest.Value, opt => opt.UseValue(i));
+                .ForMember(dest => dest.Value, opt => opt.MapFrom(src => i));
         });
 
         [Fact]

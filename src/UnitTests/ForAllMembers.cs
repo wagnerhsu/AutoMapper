@@ -22,8 +22,8 @@
 
             protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
             {
-                cfg.ForAllPropertyMaps(pm => pm.DestinationProperty.Name.StartsWith("Other"), 
-                    (pm, opt) => opt.ResolveUsing(typeof(ConditionalValueResolver), pm.SourceMember.Name));
+                cfg.ForAllPropertyMaps(pm => pm.DestinationName.StartsWith("Other"), 
+                    (pm, opt) => opt.MapFrom(typeof(ConditionalValueResolver), pm.SourceMember.Name));
 
                 cfg.CreateMap<Source, Dest>();
             });

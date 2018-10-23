@@ -45,7 +45,7 @@ namespace AutoMapper.UnitTests
             new Action(() => Configuration.AssertConfigurationIsValid())
                 .ShouldThrowException<AutoMapperConfigurationException>(ex =>
                 {
-                    ex.PropertyMap.DestinationProperty.ShouldBe(typeof(Two).GetProperty("Three"));
+                    ex.PropertyMap.DestinationMember.ShouldBe(typeof(Two).GetProperty("Three"));
                     ex.Types.ShouldBe(new TypePair(typeof(One), typeof(Two)));
                 });
         }
@@ -68,7 +68,7 @@ namespace AutoMapper.UnitTests
             c.CreateMap<Destination, Source>()
              .ForMember(dest => dest.Total, opt => opt.MapFrom(x => x.Total))
              .ReverseMap()
-             .ForMember(dest => dest.Total, opt => opt.ResolveUsing<CustomResolver>());
+             .ForMember(dest => dest.Total, opt => opt.MapFrom<CustomResolver>());
         });
 
         public class CustomResolver : IValueResolver<Source, Destination, int>
@@ -400,7 +400,7 @@ namespace AutoMapper.UnitTests
         {
             var typeMap = ConfigProvider.FindTypeMapFor<Source, Destination>();
 
-            typeMap.GetPropertyMaps().Count().ShouldBe(1);
+            typeMap.PropertyMaps.Count().ShouldBe(1);
         }
 
         [Fact]
@@ -476,8 +476,8 @@ namespace AutoMapper.UnitTests
         protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
         {
             cfg.CreateMap<Source, Destination>(MemberList.Source)
-                .ForMember(dest => dest.Value3, opt => opt.ResolveUsing(src => src.Value2))
-                .ForSourceMember(src => src.Value2, opt => opt.Ignore());
+                .ForMember(dest => dest.Value3, opt => opt.MapFrom(src => src.Value2))
+                .ForSourceMember(src => src.Value2, opt => opt.DoNotValidate());
         });
 
         [Fact]

@@ -104,7 +104,7 @@ namespace AutoMapper.UnitTests.ArraysAndLists
         int[] _source = Enumerable.Range(1, 10).ToArray();
         int[] _destination;
 
-        protected override MapperConfiguration Configuration => new MapperConfiguration(c => c.CreateMap<int, int>().ProjectUsing(i => i * 1000));
+        protected override MapperConfiguration Configuration => new MapperConfiguration(c => c.CreateMap<int, int>().ConstructUsing(i => i * 1000));
 
         protected override void Because_of()
         {
@@ -131,7 +131,8 @@ namespace AutoMapper.UnitTests.ArraysAndLists
             public bool IsMatch(TypePair context)
                 => context.SourceType == typeof(int) && context.DestinationType == typeof(int);
 
-            public Expression MapExpression(IConfigurationProvider configurationProvider, ProfileMap profileMap, PropertyMap propertyMap,
+            public Expression MapExpression(IConfigurationProvider configurationProvider, ProfileMap profileMap,
+                IMemberMap memberMap,
                 Expression sourceExpression, Expression destExpression, Expression contextExpression)
                 => Expression.Multiply(Expression.Convert(sourceExpression, typeof(int)), Expression.Constant(1000));
         }

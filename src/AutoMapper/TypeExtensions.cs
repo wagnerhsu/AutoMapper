@@ -2,12 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 
 namespace AutoMapper
 {
-#if DYNAMIC_METHODS
-    using System.Reflection.Emit;
-#endif
 
     internal static class TypeExtensions
     {
@@ -21,12 +19,7 @@ namespace AutoMapper
 
         public static IEnumerable<ConstructorInfo> GetDeclaredConstructors(this Type type) => type.GetTypeInfo().DeclaredConstructors;
 
-#if DYNAMIC_METHODS
-        public static Type CreateType(this TypeBuilder type)
-        {
-            return type.CreateTypeInfo().AsType();
-        }
-#endif
+        public static Type CreateType(this TypeBuilder type) => type.CreateTypeInfo().AsType();
 
         public static IEnumerable<MemberInfo> GetDeclaredMembers(this Type type) => type.GetTypeInfo().DeclaredMembers;
 
@@ -47,10 +40,10 @@ namespace AutoMapper
         public static MethodInfo GetDeclaredMethod(this Type type, string name) => type.GetAllMethods().FirstOrDefault(mi => mi.Name == name);
 
         public static MethodInfo GetDeclaredMethod(this Type type, string name, Type[] parameters) =>
-                type.GetAllMethods().Where(mi => mi.Name == name).MatchParameters(parameters);
+            type.GetAllMethods().Where(mi => mi.Name == name).MatchParameters(parameters);
 
         public static ConstructorInfo GetDeclaredConstructor(this Type type, Type[] parameters) =>
-               type.GetDeclaredConstructors().MatchParameters(parameters);
+            type.GetDeclaredConstructors().MatchParameters(parameters);
 
         private static TMethod MatchParameters<TMethod>(this IEnumerable<TMethod> methods, Type[] parameters) where TMethod : MethodBase =>
             methods.FirstOrDefault(mi => mi.GetParameters().Select(pi => pi.ParameterType).SequenceEqual(parameters));

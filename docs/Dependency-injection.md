@@ -1,6 +1,6 @@
 # Dependency Injection
 
-AutoMapper supports the ability to construct [Custom Value Resolvers](Custom-value-resolvers.html) and [Custom Type Converters](Custom-type-converters.html) using static service location:
+AutoMapper supports the ability to construct [Custom Value Resolvers](Custom-value-resolvers.html), [Custom Type Converters](Custom-type-converters.html), and [Value Converters](Value-converters.html) using static service location:
 
 ```c#
 Mapper.Initialize(cfg =>
@@ -120,7 +120,7 @@ public class SomeProfile : Profile
     public SomeProfile()
     {
         var map = CreateMap<MySourceType, MyDestinationType>();
-        map.ForMember(d => d.PropertyThatDependsOnIoc, opt => opt.ResolveUsing<PropertyThatDependsOnIocValueResolver>());
+        map.ForMember(d => d.PropertyThatDependsOnIoc, opt => opt.MapFrom<PropertyThatDependsOnIocValueResolver>());
     }
 }
 
