@@ -147,6 +147,13 @@ namespace AutoMapper
         IMappingExpression BeforeMap(Action<object, object> beforeFunction);
 
         /// <summary>
+        /// Execute a custom function to the source and/or destination types before member mapping
+        /// </summary>
+        /// <param name="beforeFunction">Callback for the source/destination types</param>
+        /// <returns>Itself</returns>
+        IMappingExpression BeforeMap(Action<object, object, ResolutionContext> beforeFunction);
+
+        /// <summary>
         /// Execute a custom mapping action before member mapping
         /// </summary>
         /// <typeparam name="TMappingAction">Mapping action type instantiated during mapping</typeparam>
@@ -160,6 +167,13 @@ namespace AutoMapper
         /// <param name="afterFunction">Callback for the source/destination types</param>
         /// <returns>Itself</returns>
         IMappingExpression AfterMap(Action<object, object> afterFunction);
+
+        /// <summary>
+        /// Execute a custom function to the source and/or destination types after member mapping
+        /// </summary>
+        /// <param name="afterFunction">Callback for the source/destination types</param>
+        /// <returns>Itself</returns>
+        IMappingExpression AfterMap(Action<object, object, ResolutionContext> afterFunction);
 
         /// <summary>
         /// Execute a custom mapping action after member mapping
@@ -177,6 +191,12 @@ namespace AutoMapper
         /// <param name="memberList">Member list to validate</param>
         /// <returns>Itself</returns>
         IMappingExpression ValidateMemberList(MemberList memberList);
+
+        /// <summary>
+        /// Include this configuration in all derived types' maps. Works by scanning all type maps for matches during configuration.
+        /// </summary>
+        /// <returns>Itself</returns>
+        IMappingExpression IncludeAllDerived();
     }
 
     /// <summary>
@@ -444,5 +464,10 @@ namespace AutoMapper
         /// <returns>Itself</returns>
         IMappingExpression<TSource, TDestination> ValidateMemberList(MemberList memberList);
 
+        /// <summary>
+        /// Include this configuration in all derived types' maps. Works by scanning all type maps for matches during configuration.
+        /// </summary>
+        /// <returns>Itself</returns>
+        IMappingExpression<TSource, TDestination> IncludeAllDerived();
     }
 }

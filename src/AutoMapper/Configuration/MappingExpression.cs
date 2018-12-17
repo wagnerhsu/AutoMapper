@@ -55,10 +55,16 @@ namespace AutoMapper.Configuration
         public new IMappingExpression BeforeMap(Action<object, object> beforeFunction) 
             => (IMappingExpression)base.BeforeMap(beforeFunction);
 
+        public new IMappingExpression BeforeMap(Action<object, object, ResolutionContext> beforeFunction)
+            => (IMappingExpression)base.BeforeMap(beforeFunction);
+
         public new IMappingExpression BeforeMap<TMappingAction>() where TMappingAction : IMappingAction<object, object> 
             => (IMappingExpression)base.BeforeMap<TMappingAction>();
 
         public new IMappingExpression AfterMap(Action<object, object> afterFunction) 
+            => (IMappingExpression)base.AfterMap(afterFunction);
+
+        public new IMappingExpression AfterMap(Action<object, object, ResolutionContext> afterFunction)
             => (IMappingExpression)base.AfterMap(afterFunction);
 
         public new IMappingExpression AfterMap<TMappingAction>() where TMappingAction : IMappingAction<object, object> 
@@ -80,6 +86,8 @@ namespace AutoMapper.Configuration
             => (IMappingExpression)base.ForCtorParam(ctorParamName, paramOptions);
 
         public new IMappingExpression PreserveReferences() => (IMappingExpression)base.PreserveReferences();
+
+        public new IMappingExpression IncludeAllDerived() => (IMappingExpression) base.IncludeAllDerived();
 
         protected override IPropertyMapConfiguration CreateMemberConfigurationExpression<TMember>(MemberInfo member, Type sourceType)
             => new MemberConfigurationExpression(member, sourceType);
@@ -530,6 +538,12 @@ namespace AutoMapper.Configuration
             {
                 tm.ConfiguredMemberList = memberList;
             });
+            return this;
+        }
+
+        public IMappingExpression<TSource, TDestination> IncludeAllDerived()
+        {
+            TypeMapActions.Add(tm => tm.IncludeAllDerivedTypes = true);
             return this;
         }
 

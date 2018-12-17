@@ -218,6 +218,10 @@ namespace AutoMapper
                 {
                     inlineConfiguration.Configure(typeMap);
                     typeMap.Seal(this);
+                    if (typeMap.IsClosedGeneric)
+                    {
+                        AssertConfigurationIsValid(typeMap);
+                    }
                 }
             }
             return typeMap;
@@ -297,7 +301,7 @@ namespace AutoMapper
         {
             _expressionValidator.AssertConfigurationExpressionIsValid();
 
-            _validator.AssertConfigurationIsValid(_typeMapRegistry.Values.Where(tm => !tm.SourceType.IsGenericTypeDefinition() && !tm.DestinationType.IsGenericTypeDefinition()));
+            _validator.AssertConfigurationIsValid(_typeMapRegistry.Values);
         }
 
         public IMapper CreateMapper() => new Mapper(this);
@@ -321,6 +325,19 @@ namespace AutoMapper
             foreach (var profile in Profiles)
             {
                 profile.Register(this);
+            }
+
+            foreach (var typeMap in _typeMapRegistry.Values.Where(tm => tm.IncludeAllDerivedTypes))
+            {
+                foreach (var derivedMap in _typeMapRegistry
+                    .Where(tm =>
+                        typeMap.SourceType.IsAssignableFrom(tm.Key.SourceType) &&
+                        typeMap.DestinationType.IsAssignableFrom(tm.Key.DestinationType) &&
+                        typeMap != tm.Value)
+                    .Select(tm => tm.Value))
+                {
+                    typeMap.IncludeDerivedTypes(derivedMap.SourceType, derivedMap.DestinationType);
+                }
             }
 
             foreach (var profile in Profiles)

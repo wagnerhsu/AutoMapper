@@ -3,7 +3,11 @@ using AutoMapper.Configuration;
 
 namespace AutoMapper
 {
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Linq.Expressions;
     using ObjectMappingOperationOptions = MappingOperationOptions<object, object>;
+    using QueryableExtensions;
 
     public class Mapper : IRuntimeMapper
     {
@@ -186,8 +190,8 @@ namespace AutoMapper
 
         public Mapper(IConfigurationProvider configurationProvider, Func<Type, object> serviceCtor)
         {
-            _configurationProvider = configurationProvider;
-            _serviceCtor = serviceCtor;
+            _configurationProvider = configurationProvider ?? throw new ArgumentNullException(nameof(configurationProvider));
+            _serviceCtor = serviceCtor ?? throw new ArgumentNullException(nameof(serviceCtor));
             DefaultContext = new ResolutionContext(new ObjectMappingOperationOptions(serviceCtor), this);
         }
 
@@ -373,5 +377,11 @@ namespace AutoMapper
 
             return func(source, destination, context);
         }
+
+        IQueryable<TDestination> IMapper.ProjectTo<TDestination>(IQueryable source, object parameters, params Expression<Func<TDestination, object>>[] membersToExpand)
+            => source.ProjectTo(_configurationProvider, parameters, membersToExpand);
+
+        IQueryable<TDestination> IMapper.ProjectTo<TDestination>(IQueryable source, IDictionary<string, object> parameters, params string[] membersToExpand)
+            => source.ProjectTo<TDestination>(_configurationProvider, parameters, membersToExpand);
     }
 }

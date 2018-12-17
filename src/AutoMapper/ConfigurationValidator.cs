@@ -57,11 +57,25 @@ namespace AutoMapper
         {
             if(typeMap == null)
             {
+                if (types.SourceType.IsGenericParameter || types.DestinationType.IsGenericParameter)
+                {
+                    return;
+                }
                 typeMap = _config.ResolveTypeMap(types.SourceType, types.DestinationType);
             }
             if (typeMap != null)
             {
-                if(typeMapsChecked.Contains(typeMap))
+                if (typeMap.IsClosedGeneric)
+                {
+                    // it was already validated
+                    return;
+                }
+                // dynamic maps get mapped at runtime yolo
+                if (typeMap.IsConventionMap && typeMap.Profile.CreateMissingTypeMaps)
+                {
+                    return;
+                }
+                if (typeMapsChecked.Contains(typeMap))
                 {
                     return;
                 }
@@ -80,10 +94,6 @@ namespace AutoMapper
                 var mapperToUse = _config.FindMapper(types);
                 if (mapperToUse == null)
                 {
-                    // Maps with no match get mapped at runtime yolo
-                    if (propertyMap.TypeMap.Profile.CreateMissingTypeMaps)
-                        return;
-
                     throw new AutoMapperConfigurationException(propertyMap.TypeMap.Types) { PropertyMap = propertyMap };
                 }
                 var context = new ValidationContext(types, propertyMap, mapperToUse);
@@ -100,7 +110,10 @@ namespace AutoMapper
         {
             foreach (var propertyMap in typeMap.PropertyMaps)
             {
-                if (propertyMap.Ignored) continue;
+                if(propertyMap.Ignored || propertyMap.ValueConverterConfig != null || propertyMap.ValueResolverConfig != null)
+                {
+                    continue;
+                }
 
                 var sourceType = propertyMap.SourceType;
 

@@ -77,6 +77,8 @@ namespace AutoMapper
 
         public bool ConstructDestinationUsingServiceLocator { get; set; }
 
+        public bool IncludeAllDerivedTypes { get; set; }
+
         public MemberList ConfiguredMemberList { get; set; }
 
         public IEnumerable<TypePair> IncludedDerivedTypes => _includedDerivedTypes;
@@ -127,6 +129,8 @@ namespace AutoMapper
             && DestinationTypeOverride == null
             && ConfiguredMemberList != MemberList.None
             && !(IsValid ?? false);
+
+        public bool IsClosedGeneric { get; internal set; }
 
         public bool ConstructorParameterMatches(string destinationPropertyName) =>
             ConstructorMap?.CtorParams.Any(c => !c.HasDefaultValue && string.Equals(c.Parameter.Name, destinationPropertyName, StringComparison.OrdinalIgnoreCase)) == true;
