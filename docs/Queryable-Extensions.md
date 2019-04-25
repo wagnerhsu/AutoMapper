@@ -152,6 +152,10 @@ dbContext.Orders.ProjectTo<OrderDto>(
     null,
     "Customer",
     "LineItems");
+// for collections
+dbContext.Orders.ProjectTo<OrderDto>(
+    null,
+    dest => dest.LineItems.Select(item => item.Product));
 ```
 For more information, see [the tests](https://github.com/AutoMapper/AutoMapper/search?p=1&q=ExplicitExpansion&utf8=%E2%9C%93).
 
@@ -199,6 +203,7 @@ However, using a dictionary will result in hard-coded values in the query instea
 
 Not all mapping options can be supported, as the expression generated must be interpreted by a LINQ provider. Only what is supported by LINQ providers is supported by AutoMapper:
 * MapFrom (Expression-based)
+* ConvertUsing (Expression-based)
 * Ignore
 * NullSubstitute
 

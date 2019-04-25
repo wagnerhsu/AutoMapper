@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using AutoMapper.Configuration;
+using AutoMapper.Features;
 using AutoMapper.Internal;
 using AutoMapper.QueryableExtensions;
 using AutoMapper.QueryableExtensions.Impl;
@@ -47,6 +48,8 @@ namespace AutoMapper
             Configuration = new ProfileMap(configurationExpression);
             Profiles = new[] { Configuration }.Concat(configurationExpression.Profiles.Select(p => new ProfileMap(p, configurationExpression))).ToArray();
 
+            configurationExpression.Features.Configure(this);
+
             foreach (var beforeSealAction in configurationExpression.Advanced.BeforeSealActions)
                 beforeSealAction?.Invoke(this);
             Seal();
@@ -85,6 +88,8 @@ namespace AutoMapper
 
         public IEnumerable<IExpressionBinder> Binders { get; }
 
+        public Features<IRuntimeFeature> Features { get; } = new Features<IRuntimeFeature>();
+
         public Func<TSource, TDestination, ResolutionContext, TDestination> GetMapperFunc<TSource, TDestination>(
             TypePair types, IMemberMap memberMap = null)
         {
@@ -98,7 +103,7 @@ namespace AutoMapper
 
         public void CompileMappings()
         {
-            foreach (var request in _typeMapPlanCache.Keys.Select(types => new MapRequest(types, types)).ToArray())
+            foreach (var request in _typeMapPlanCache.Keys.Where(t=>!t.IsGenericTypeDefinition).Select(types => new MapRequest(types, types)).ToArray())
             {
                 GetMapperFunc(request);
             }
@@ -372,6 +377,8 @@ namespace AutoMapper
             {
                 typeMap.Seal(this);
             }
+
+            Features.Seal(this);
         }
 
         private IEnumerable<TypeMap> GetDerivedTypeMaps(TypeMap typeMap)
@@ -395,13 +402,16 @@ namespace AutoMapper
                 {
                     yield return typeMap;
                 }
-                typeMap = ResolveTypeMap(pair);
-                // we want the exact map the user included, but we could instantiate an open generic
-                if(typeMap == null || typeMap.Types != pair || typeMap.IsConventionMap)
+                else
                 {
-                    throw QueryMapperHelper.MissingMapException(pair);
+                    typeMap = ResolveTypeMap(pair);
+                    // we want the exact map the user included, but we could instantiate an open generic
+                    if(typeMap == null || typeMap.Types != pair || typeMap.IsConventionMap)
+                    {
+                        throw QueryMapperHelper.MissingMapException(pair);
+                    }
+                    yield return typeMap;
                 }
-                yield return typeMap;
             }
         }
 
@@ -442,19 +452,29 @@ namespace AutoMapper
             }
             if(userMap == null && (cachedMap = GetCachedMap(initialTypes, genericTypePair.Value)) != null)
             {
-                genericTypePair = cachedMap.Types.GetOpenGenericTypePair();
-                if(genericTypePair == null)
+                if(!cachedMap.Types.IsGeneric)
                 {
                     return cachedMap;
                 }
-                (genericMap, profile, typePair) = (cachedMap.Profile.GetGenericMap(cachedMap.Types), cachedMap.Profile, cachedMap.Types.CloseGenericTypes(typePair));
+
+                genericMap = cachedMap.Profile.GetGenericMap(cachedMap.Types);
+                profile = cachedMap.Profile;
+                typePair = cachedMap.Types.CloseGenericTypes(typePair);
+            }
+            else if (userMap == null)
+            {
+                var item = Profiles
+                    .Select(p => new {GenericMap = p.GetGenericMap(typePair), Profile = p})
+                    .FirstOrDefault(p => p.GenericMap != null);
+                genericMap = item?.GenericMap;
+                profile = item?.Profile;
             }
             else
             {
-                (genericMap, profile) = userMap == null ?
-                    Profiles.Select(p => (GenericMap: p.GetGenericMap(typePair), p)).FirstOrDefault(p => p.GenericMap != null) :
-                    (userMap.Profile.GetGenericMap(typePair), userMap.Profile);
+                genericMap = userMap.Profile.GetGenericMap(typePair);
+                profile = userMap.Profile;
             }
+
             if(genericMap == null)
             {
                 return null;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using AutoMapper.Features;
 using AutoMapper.Mappers;
 
 namespace AutoMapper.Configuration
@@ -27,8 +28,14 @@ namespace AutoMapper.Configuration
 
         public AdvancedConfiguration Advanced { get; } = new AdvancedConfiguration();
 
+        public Features<IGlobalFeature> Features { get; } = new Features<IGlobalFeature>();
+
         private class NamedProfile : Profile
         {
+            public NamedProfile(string profileName) : base(profileName)
+            {
+            }
+
             public NamedProfile(string profileName, Action<IProfileExpression> config) : base(profileName, config)
             {
             }
@@ -44,40 +51,79 @@ namespace AutoMapper.Configuration
         public void AddProfile(Type profileType) => AddProfile((Profile)Activator.CreateInstance(profileType));
 
         public void AddProfiles(IEnumerable<Assembly> assembliesToScan)
-            => AddProfilesCore(assembliesToScan);
+            => AddMaps(assembliesToScan);
 
         public void AddProfiles(params Assembly[] assembliesToScan)
-            => AddProfilesCore(assembliesToScan);
+            => AddMaps(assembliesToScan);
 
         public void AddProfiles(IEnumerable<string> assemblyNamesToScan)
-            => AddProfilesCore(assemblyNamesToScan.Select(name => Assembly.Load(new AssemblyName(name))));
+            => AddMaps(assemblyNamesToScan);
 
         public void AddProfiles(params string[] assemblyNamesToScan)
-            => AddProfilesCore(assemblyNamesToScan.Select(name => Assembly.Load(new AssemblyName(name))));
+            => AddMaps(assemblyNamesToScan);
 
         public void AddProfiles(IEnumerable<Type> typesFromAssembliesContainingProfiles)
-            => AddProfilesCore(typesFromAssembliesContainingProfiles.Select(t => t.GetTypeInfo().Assembly));
+            => AddMaps(typesFromAssembliesContainingProfiles);
 
         public void AddProfiles(params Type[] typesFromAssembliesContainingProfiles)
-            => AddProfilesCore(typesFromAssembliesContainingProfiles.Select(t => t.GetTypeInfo().Assembly));
+            => AddMaps(typesFromAssembliesContainingProfiles);
 
-        private void AddProfilesCore(IEnumerable<Assembly> assembliesToScan)
+        public void AddProfiles(IEnumerable<Profile> enumerableOfProfiles)
         {
-            var allTypes = assembliesToScan.Where(a => !a.IsDynamic).SelectMany(a => a.GetDefinedTypes()).ToArray();
-
-            var profiles =
-                allTypes
-                    .Where(t => typeof(Profile).GetTypeInfo().IsAssignableFrom(t))
-                    .Where(t => !t.IsAbstract)
-                    .Select(t => t.AsType());
-
-            foreach (var profile in profiles)
+            foreach (var profile in enumerableOfProfiles)
             {
                 AddProfile(profile);
             }
-
         }
 
+        public void AddMaps(IEnumerable<Assembly> assembliesToScan)
+            => AddMapsCore(assembliesToScan);
+
+        public void AddMaps(params Assembly[] assembliesToScan)
+            => AddMapsCore(assembliesToScan);
+
+        public void AddMaps(IEnumerable<string> assemblyNamesToScan)
+            => AddMapsCore(assemblyNamesToScan.Select(Assembly.Load));
+
+        public void AddMaps(params string[] assemblyNamesToScan)
+            => AddMaps((IEnumerable<string>)assemblyNamesToScan);
+
+        public void AddMaps(IEnumerable<Type> typesFromAssembliesContainingMappingDefinitions)
+            => AddMapsCore(typesFromAssembliesContainingMappingDefinitions.Select(t => t.GetTypeInfo().Assembly));
+
+        public void AddMaps(params Type[] typesFromAssembliesContainingMappingDefinitions)
+            => AddMaps((IEnumerable<Type>)typesFromAssembliesContainingMappingDefinitions);
+
+        private void AddMapsCore(IEnumerable<Assembly> assembliesToScan)
+        {
+            var allTypes = assembliesToScan.Where(a => !a.IsDynamic && a != typeof(NamedProfile).Assembly).SelectMany(a => a.GetDefinedTypes()).ToArray();
+            var autoMapAttributeProfile = new NamedProfile(nameof(AutoMapAttribute));
+
+            foreach (var type in allTypes)
+            {
+                if (typeof(Profile).IsAssignableFrom(type) && !type.IsAbstract)
+                {
+                    AddProfile(type.AsType());
+                }
+
+                var autoMapAttribute = type.GetCustomAttribute<AutoMapAttribute>();
+                if (autoMapAttribute != null)
+                {
+                    var mappingExpression = (MappingExpression) autoMapAttributeProfile.CreateMap(autoMapAttribute.SourceType, type);
+                    autoMapAttribute.ApplyConfiguration(mappingExpression);
+
+                    foreach (var memberInfo in type.GetMembers(BindingFlags.Public | BindingFlags.Instance))
+                    {
+                        foreach (var memberConfigurationProvider in memberInfo.GetCustomAttributes().OfType<IMemberConfigurationProvider>())
+                        {
+                            mappingExpression.ForMember(memberInfo, cfg => memberConfigurationProvider.ApplyConfiguration(cfg));
+                        }
+                    }
+                }
+            }
+
+            AddProfile(autoMapAttributeProfile);
+        }
 
         public void ConstructServicesUsing(Func<Type, object> constructor) => ServiceCtor = constructor;
     }

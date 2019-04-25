@@ -6,7 +6,6 @@ using System.Reflection;
 
 namespace AutoMapper.Configuration
 {
-    using static Expression;
     using static AutoMapper.Internal.ExpressionFactory;
 
     public class MemberConfigurationExpression<TSource, TDestination, TMember> : IMemberConfigurationExpression<TSource, TDestination, TMember>, IPropertyMapConfiguration
@@ -243,7 +242,7 @@ namespace AutoMapper.Configuration
 
         public void Ignore() => Ignore(ignorePaths: true);
 
-        internal void Ignore(bool ignorePaths) =>
+        public void Ignore(bool ignorePaths) =>
             PropertyMapActions.Add(pm =>
             {
                 pm.Ignored = true;
@@ -320,7 +319,7 @@ namespace AutoMapper.Configuration
         {
             var destMember = DestinationMember;
 
-            if(destMember.DeclaringType.IsGenericType())
+            if(destMember.DeclaringType.IsGenericTypeDefinition())
             {
                 destMember = typeMap.DestinationTypeDetails.PublicReadAccessors.Single(m => m.Name == destMember.Name);
             }
@@ -336,12 +335,13 @@ namespace AutoMapper.Configuration
             {
                 action(propertyMap);
             }
+            propertyMap.CheckMappedReadonly();
         }
 
-        public IPropertyMapConfiguration Reverse()
-        {
-            var newSourceExpression = MemberAccessLambda(DestinationMember);
-            return PathConfigurationExpression<TDestination, TSource, object>.Create(_sourceMember, newSourceExpression);
-        }
+        public LambdaExpression SourceExpression => _sourceMember;
+        public LambdaExpression GetDestinationExpression() => MemberAccessLambda(DestinationMember);
+
+        public IPropertyMapConfiguration Reverse() =>
+            PathConfigurationExpression<TDestination, TSource, object>.Create(_sourceMember, GetDestinationExpression());
     }
 }

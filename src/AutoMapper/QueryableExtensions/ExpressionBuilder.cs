@@ -18,7 +18,6 @@ namespace AutoMapper.QueryableExtensions
 
     public interface IExpressionBuilder
     {
-        LambdaExpression[] GetMapExpression(Type sourceType, Type destinationType, ParameterBag parameters, MemberInfo[] membersToExpand);
         LambdaExpression[] GetMapExpression(Type sourceType, Type destinationType, object parameters, MemberInfo[] membersToExpand);
         LambdaExpression[] CreateMapExpression(ExpressionRequest request, TypePairCount typePairCount, LetPropertyMaps letPropertyMaps);
         Expression CreateMapExpression(ExpressionRequest request, Expression instanceParameter, TypePairCount typePairCount, LetPropertyMaps letPropertyMaps);
@@ -54,31 +53,6 @@ namespace AutoMapper.QueryableExtensions
             _expressionCache = new LockingConcurrentDictionary<ExpressionRequest, LambdaExpression[]>(CreateMapExpression);
         }
 
-        public LambdaExpression[] GetMapExpression(Type sourceType, Type destinationType, ParameterBag parameters,
-            MemberInfo[] membersToExpand)
-        {
-            if (sourceType == null)
-            {
-                throw new ArgumentNullException(nameof(sourceType));
-            }
-            if (destinationType == null)
-            {
-                throw new ArgumentNullException(nameof(destinationType));
-            }
-            if (parameters == null)
-            {
-                throw new ArgumentNullException(nameof(parameters));
-            }
-            if (membersToExpand == null)
-            {
-                throw new ArgumentNullException(nameof(membersToExpand));
-            }
-
-            var cachedExpressions = _expressionCache.GetOrAdd(new ExpressionRequest(sourceType, destinationType, membersToExpand, null));
-
-            return cachedExpressions.Select(e => Prepare(e, parameters)).Cast<LambdaExpression>().ToArray();
-        }
-
         public LambdaExpression[] GetMapExpression(Type sourceType, Type destinationType, object parameters,
             MemberInfo[] membersToExpand)
         {
@@ -100,33 +74,12 @@ namespace AutoMapper.QueryableExtensions
             return cachedExpressions.Select(e => Prepare(e, parameters)).Cast<LambdaExpression>().ToArray();
         }
 
-        private Expression Prepare(Expression cachedExpression, ParameterBag parameters)
-        {
-            Expression result;
-            if(parameters.Any())
-            {
-                var visitor = new ConstantExpressionReplacementVisitor(parameters);
-                result = visitor.Visit(cachedExpression);
-            }
-            else
-            {
-                result = cachedExpression;
-            }
-            // perform null-propagation if this feature is enabled.
-            if(_configurationProvider.EnableNullPropagationForQueryMapping)
-            {
-                var nullVisitor = new NullsafeQueryRewriter();
-                return nullVisitor.Visit(result);
-            }
-            return result;
-        }
-
         private Expression Prepare(Expression cachedExpression, object parameters)
         {
             Expression result;
             if(parameters != null)
             {
-                var visitor = new ObjectParameterExpressionReplacementVisitor(parameters);
+                var visitor = ParameterExpressionVisitor.Create(parameters);
                 result = visitor.Visit(cachedExpression);
             }
             else
@@ -259,17 +212,19 @@ namespace AutoMapper.QueryableExtensions
                                                             pm.CanResolveValue && ReflectionHelper.CanBeSet(pm.DestinationMember))
                                                .OrderBy(pm => pm.DestinationName))
             {
-                letPropertyMaps.Push(propertyMap);
+                var propertyExpression = new PropertyExpression(propertyMap);
+                letPropertyMaps.Push(propertyExpression);
 
-                CreateMemberBinding(propertyMap);
+                CreateMemberBinding(propertyExpression);
 
                 letPropertyMaps.Pop();
             }
-
             return bindings;
-            void CreateMemberBinding(PropertyMap propertyMap)
+            void CreateMemberBinding(PropertyExpression propertyExpression)
             {
+                var propertyMap = propertyExpression.PropertyMap;
                 var result = ResolveExpression(propertyMap, request.SourceType, instanceParameter, letPropertyMaps);
+                propertyExpression.Expression = result.ResolutionExpression;
                 var propertyTypeMap = _configurationProvider.ResolveTypeMap(result.Type, propertyMap.DestinationType);
                 var propertyRequest = new ExpressionRequest(result.Type, propertyMap.DestinationType, request.MembersToExpand, request);
                 if(propertyRequest.AlreadyExists)
@@ -347,58 +302,58 @@ namespace AutoMapper.QueryableExtensions
             }
         }
 
-        private class ObjectParameterExpressionReplacementVisitor : ExpressionVisitor
+        private abstract class ParameterExpressionVisitor : ExpressionVisitor
         {
-            private readonly object _parameters;
+            public static ParameterExpressionVisitor Create(object parameters) =>
+                parameters is ParameterBag dictionary ? (ParameterExpressionVisitor) new ConstantExpressionReplacementVisitor(dictionary) : new ObjectParameterExpressionReplacementVisitor(parameters);
 
-            public ObjectParameterExpressionReplacementVisitor(object parameters) => _parameters = parameters;
+            protected abstract Expression GetValue(string name);
 
             protected override Expression VisitMember(MemberExpression node)
             {
-                if (!node.Member.DeclaringType.Has<CompilerGeneratedAttribute>())
+                if(!node.Member.DeclaringType.Has<CompilerGeneratedAttribute>())
                 {
                     return base.VisitMember(node);
                 }
                 var parameterName = node.Member.Name;
-
-                var matchingMember = _parameters.GetType().GetDeclaredProperty(parameterName);
-
-                return matchingMember != null 
-                    ? Property(Constant(_parameters), matchingMember) 
-                    : base.VisitMember(node);
-            }
-        }
-
-        private class ConstantExpressionReplacementVisitor : ExpressionVisitor
-        {
-            private readonly ParameterBag _paramValues;
-
-            public ConstantExpressionReplacementVisitor(
-                ParameterBag paramValues) => _paramValues = paramValues;
-
-            protected override Expression VisitMember(MemberExpression node)
-            {
-                if (!node.Member.DeclaringType.Has<CompilerGeneratedAttribute>())
-                {
-                    return base.VisitMember(node);
-                }
-                var parameterName = node.Member.Name;
-                if (!_paramValues.TryGetValue(parameterName, out object parameterValue))
+                var parameterValue = GetValue(parameterName);
+                if(parameterValue == null)
                 {
                     const string vbPrefix = "$VB$Local_";
-                    if (!parameterName.StartsWith(vbPrefix, StringComparison.Ordinal) || !_paramValues.TryGetValue(parameterName.Substring(vbPrefix.Length), out parameterValue))
+                    if(!parameterName.StartsWith(vbPrefix, StringComparison.Ordinal) || (parameterValue = GetValue(parameterName.Substring(vbPrefix.Length))) == null)
                     {
                         return base.VisitMember(node);
                     }
                 }
-                return Convert(Constant(parameterValue), node.Member.GetMemberType());
+                return ToType(parameterValue, node.Member.GetMemberType());
+            }
+
+            private class ObjectParameterExpressionReplacementVisitor : ParameterExpressionVisitor
+            {
+                private readonly object _parameters;
+
+                public ObjectParameterExpressionReplacementVisitor(object parameters) => _parameters = parameters;
+
+                protected override Expression GetValue(string name)
+                {
+                    var matchingMember = _parameters.GetType().GetDeclaredProperty(name);
+                    return matchingMember != null ? Property(Constant(_parameters), matchingMember) : null;
+                }
+            }
+            private class ConstantExpressionReplacementVisitor : ParameterExpressionVisitor
+            {
+                private readonly ParameterBag _paramValues;
+
+                public ConstantExpressionReplacementVisitor(ParameterBag paramValues) => _paramValues = paramValues;
+
+                protected override Expression GetValue(string name) =>
+                    _paramValues.TryGetValue(name, out object parameterValue) ? Constant(parameterValue) : null;
             }
         }
 
-
         public class FirstPassLetPropertyMaps : LetPropertyMaps
         {
-            Stack<PropertyMap> _currentPath = new Stack<PropertyMap>();
+            Stack<PropertyExpression> _currentPath = new Stack<PropertyExpression>();
             List<PropertyPath> _savedPaths = new List<PropertyPath>();
             IConfigurationProvider _configurationProvider;
 
@@ -407,7 +362,7 @@ namespace AutoMapper.QueryableExtensions
 
             public override Expression GetSubQueryMarker()
             {
-                var propertyMap = _currentPath.Peek();
+                var propertyMap = _currentPath.Peek().PropertyMap;
                 var mapFrom = propertyMap.CustomMapExpression;
                 if(!IsSubQuery() || _configurationProvider.ResolveTypeMap(propertyMap.SourceType, propertyMap.DestinationType) == null)
                 {
@@ -428,7 +383,7 @@ namespace AutoMapper.QueryableExtensions
                 }
             }
 
-            public override void Push(PropertyMap propertyMap) => _currentPath.Push(propertyMap);
+            public override void Push(PropertyExpression propertyExpression) => _currentPath.Push(propertyExpression);
 
             public override void Pop() => _currentPath.Pop();
 
@@ -438,15 +393,11 @@ namespace AutoMapper.QueryableExtensions
 
             public override QueryExpressions GetSubQueryExpression(ExpressionBuilder builder, Expression projection, TypeMap typeMap, ExpressionRequest request, Expression instanceParameter, TypePairCount typePairCount)
             {
-                var letMapInfos = _savedPaths.Select(path => new
-                {
+                var letMapInfos = _savedPaths.Select(path =>
+                new {
                     MapFrom = path.Last.CustomMapExpression,
-                    MapFromSource = path.PropertyMaps.Take(path.PropertyMaps.Length - 1).Select(pm=>pm.SourceMember).MemberAccesses(instanceParameter),
-                    Property = new PropertyDescription
-                    (
-                        "__"+string.Join("#", path.PropertyMaps.Select(pm => pm.DestinationName)),
-                        path.Last.SourceType
-                    ),
+                    MapFromSource = path.GetSourceExpression(instanceParameter),
+                    Property = path.GetPropertyDescription(),
                     path.Marker
                 }).ToArray();
 
@@ -538,7 +489,7 @@ namespace AutoMapper.QueryableExtensions
 
         public virtual Expression GetSubQueryMarker() => null;
 
-        public virtual void Push(PropertyMap propertyMap) {}
+        public virtual void Push(PropertyExpression propertyExpression) {}
 
         public virtual void Pop() {}
 
@@ -551,14 +502,18 @@ namespace AutoMapper.QueryableExtensions
 
         public struct PropertyPath
         {
-            public PropertyPath(PropertyMap[] propertyMaps, Expression marker)
+            private readonly PropertyExpression[] _properties; 
+
+            public PropertyPath(PropertyExpression[] properties, Expression marker)
             {
-                PropertyMaps = propertyMaps;
+                _properties = properties;
                 Marker = marker;
             }
-            public PropertyMap[] PropertyMaps { get; }
             public Expression Marker { get; }
-            public PropertyMap Last => PropertyMaps[PropertyMaps.Length - 1];
+            public PropertyMap Last => _properties[_properties.Length - 1].PropertyMap;
+            public Expression GetSourceExpression(Expression parameter) =>
+                _properties.Take(_properties.Length - 1).SelectMany(p=>new MemberPath(p.Expression).Members).MemberAccesses(parameter);
+            public PropertyDescription GetPropertyDescription() => new PropertyDescription("__" + string.Join("#", _properties.Select(p => p.PropertyMap.DestinationName)), Last.SourceType);
         }
     }
 
@@ -581,7 +536,14 @@ namespace AutoMapper.QueryableExtensions
             this IExpressionBuilder expressionBuilder)
         {
             return (Expression<Func<TSource, TDestination>>) expressionBuilder.GetMapExpression(typeof(TSource),
-                typeof(TDestination), new Dictionary<string, object>(), new MemberInfo[0])[0];
+                typeof(TDestination), null, new MemberInfo[0])[0];
         }
+    }
+
+    public class PropertyExpression
+    {
+        public PropertyExpression(PropertyMap propertyMap) => PropertyMap = propertyMap;
+        public Expression Expression { get; set; }
+        public PropertyMap PropertyMap { get; }
     }
 }

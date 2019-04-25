@@ -10,6 +10,7 @@ namespace AutoMapper
         TypeMap TypeMap { get; }
         Type SourceType { get; }
         IEnumerable<MemberInfo> SourceMembers { get; }
+        LambdaExpression CustomSource { get; }
         Type DestinationType { get; }
         string DestinationName { get; }
         TypePair Types { get; }
@@ -25,5 +26,7 @@ namespace AutoMapper
         ValueResolverConfiguration ValueResolverConfig { get; }
         ValueConverterConfiguration ValueConverterConfig { get; }
         IEnumerable<ValueTransformerConfiguration> ValueTransformers { get; }
+        MemberInfo SourceMember { get; }
+        bool IsMapped { get; }
     }
 }

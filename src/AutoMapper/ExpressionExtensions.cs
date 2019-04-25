@@ -12,7 +12,12 @@ namespace AutoMapper
     internal static class ExpressionExtensions
     {
         public static Expression MemberAccesses(this IEnumerable<MemberInfo> members, Expression obj) =>
-            members.Aggregate(obj, MakeMemberAccess);
+            members
+                .Aggregate(
+                        obj,
+                        (inner, getter) => getter is MethodInfo method ?
+                            (getter.IsStatic() ? Call(null, method, inner) : (Expression)Call(inner, method)) :
+                            MakeMemberAccess(getter.IsStatic() ? null : inner, getter));
 
         public static IEnumerable<MemberExpression> GetMembers(this Expression expression)
         {
@@ -33,10 +38,15 @@ namespace AutoMapper
             }
         }
 
-        public static bool IsMemberPath(this LambdaExpression exp)
+        public static void EnsureMemberPath(this LambdaExpression exp, string name)
         {
-            return exp.Body.GetMembers().LastOrDefault()?.Expression == exp.Parameters.First();
+            if(!exp.IsMemberPath())
+            {
+                throw new ArgumentOutOfRangeException(name, "Only member accesses are allowed. "+exp);
+            }
         }
+
+        public static bool IsMemberPath(this LambdaExpression exp) => exp.Body.GetMembers().LastOrDefault()?.Expression == exp.Parameters.First();
 
         public static Expression ReplaceParameters(this LambdaExpression exp, params Expression[] replace)
             => ExpressionFactory.ReplaceParameters(exp, replace);

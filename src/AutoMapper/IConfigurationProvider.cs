@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using AutoMapper.Configuration;
+using AutoMapper.Features;
 using AutoMapper.QueryableExtensions;
 
 namespace AutoMapper
@@ -101,6 +102,12 @@ namespace AutoMapper
         IEnumerable<IObjectMapper> GetMappers();
 
         /// <summary>
+        /// Gets the features collection.
+        /// </summary>
+        /// <value>The feature colection.</value>
+        Features<IRuntimeFeature> Features { get; }
+
+        /// <summary>
         /// Find a matching object mapper.
         /// </summary>
         /// <param name="types">the types to match</param>
@@ -159,7 +166,7 @@ namespace AutoMapper
         /// <summary>
         /// Builds the execution plan used to map the source to destination.
         /// Useful to understand what exactly is happening during mapping.
-        /// See <a href="http://automapper.readthedocs.io/en/latest/Understanding-your-mapping.html">the wiki</a> for details.
+        /// See <a href="https://automapper.readthedocs.io/en/latest/Understanding-your-mapping.html">the wiki</a> for details.
         /// </summary>
         /// <param name="sourceType">the runtime type of the source object</param>
         /// <param name="destinationType">the runtime type of the destination object</param>
@@ -169,7 +176,7 @@ namespace AutoMapper
         /// <summary>
         /// Builds the execution plan used to map the source to destination.
         /// Useful to understand what exactly is happening during mapping.
-        /// See <a href="http://automapper.readthedocs.io/en/latest/Understanding-your-mapping.html">the wiki</a> for details.
+        /// See <a href="https://automapper.readthedocs.io/en/latest/Understanding-your-mapping.html">the wiki</a> for details.
         /// </summary>
         /// <param name="mapRequest">The source/destination map request</param>
         /// <returns>the execution plan</returns>
